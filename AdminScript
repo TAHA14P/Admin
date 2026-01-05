@@ -1,0 +1,168 @@
+-- Admin Script with ESP, Explorer, Properties
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+-- Admin Tag above head
+local function createAdminTag(player)
+    local character = player.Character or player.CharacterAdded:Wait()
+    local head = character:WaitForChild("Head")
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0, 100, 0, 40)
+    billboard.Adornee = head
+    billboard.AlwaysOnTop = true
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Text = "Admin"
+    label.TextColor3 = Color3.fromRGB(255, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.SourceSansBold
+    label.TextScaled = true
+    label.Parent = billboard
+
+    billboard.Parent = head
+end
+
+createAdminTag(LocalPlayer)
+
+-- ESP
+local espObjects = {}
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local box = Instance.new("BoxHandleAdornment")
+    box.Adornee = root
+    box.Size = Vector3.new(4,6,2)
+    box.Color3 = Color3.fromRGB(0,255,0)
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Transparency = 0.5
+    box.Parent = Workspace
+    espObjects[player] = box
+end
+
+local function removeESP(player)
+    if espObjects[player] then
+        espObjects[player]:Destroy()
+        espObjects[player] = nil
+    end
+end
+
+Players.PlayerAdded:Connect(createESP)
+Players.PlayerRemoving:Connect(removeESP)
+
+for _, plr in pairs(Players:GetPlayers()) do
+    createESP(plr)
+end
+
+-- Explorer & Property Editor
+local function listChildren(obj, depth)
+    depth = depth or 0
+    print(string.rep("  ", depth) .. obj.Name .. " : " .. obj.ClassName)
+    for _, child in pairs(obj:GetChildren()) do
+        listChildren(child, depth+1)
+    end
+end
+
+local function setProperty(path, prop, value)
+    local target = Workspace:FindFirstChild(path, true)
+    if target then
+        if target[prop] ~= nil then
+            local success, err = pcall(function()
+                target[prop] = value
+            end)
+            if success then
+                print("Set "..prop.." of "..path.." to "..tostring(value))
+            else
+                print("Error:", err)
+            end
+        else
+            print("Property not found:", prop)
+        end
+    else
+        print("Object not found:", path)
+    end
+end
+
+-- Commands Table
+local commands = {}
+
+commands["kill"] = function(args)
+    local targetName = args[1]
+    local target = Players:FindFirstChild(targetName)
+    if target and target.Character and target.Character:FindFirstChild("Humanoid") then
+        target.Character.Humanoid.Health = 0
+    end
+end
+
+commands["speed"] = function(args)
+    local speed = tonumber(args[1])
+    if speed and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = speed
+    end
+end
+
+commands["fly"] = function()
+    local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+    if hum then
+        hum.PlatformStand = true
+    end
+end
+
+commands["reset"] = function()
+    LocalPlayer.Character:BreakJoints()
+end
+
+-- Explorer
+commands["explorer"] = function()
+    print("=== Explorer ===")
+    listChildren(Workspace)
+end
+
+-- Set Property
+commands["setprop"] = function(args)
+    local objName = args[1]
+    local propName = args[2]
+    local value = args[3]
+
+    -- try to convert to number or bool if possible
+    if tonumber(value) then
+        value = tonumber(value)
+    elseif value == "true" then
+        value = true
+    elseif value == "false" then
+        value = false
+    end
+
+    setProperty(objName, propName, value)
+end
+
+-- Chat Listener
+LocalPlayer.Chatted:Connect(function(msg)
+    if msg:sub(1,1) == ":" then
+        local args = msg:sub(2):split(" ")
+        local cmdName = table.remove(args,1):lower()
+        local func = commands[cmdName]
+        if func then
+            func(args)
+        else
+            print("Unknown command:", cmdName)
+        end
+    end
+end)
+
+-- System message
+game:GetService("StarterGui"):SetCore("ChatMakeSystemMessage", {
+    Text = "[Admin] Loaded ESP + Explorer + Properties!";
+    Color = Color3.fromRGB(255,0,0);
+    Font = Enum.Font.SourceSansBold;
+    FontSize = Enum.FontSize.Size24;
+})
