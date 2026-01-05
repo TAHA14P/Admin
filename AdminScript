@@ -1,124 +1,189 @@
--- R6 Admin Script with ESP + Admin Tag + Simple UI
+-- Blox Fruits Educational GUI with Chest/Fruit/Berry/Races/Mirage + Shopping Tab
+-- Safe local simulation for learning purposes
+
+-- Load Rayfield
+local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/InfiniteYield/master/Source/Rayfield.lua"))()
+
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local HRP = LocalPlayer.Character and LocalPlayer.Character:WaitForChild("HumanoidRootPart") or LocalPlayer.CharacterAdded:Wait():WaitForChild("HumanoidRootPart")
+local RunService = game:GetService("RunService")
 
--- ===== Admin Tag =====
-local function createAdminTag(player)
-    local character = player.Character or player.CharacterAdded:Wait()
-    local head = character:WaitForChild("Head")
+-- ===== Config =====
+local config = {
+    AutoFarm = false,
+    FarmMode = "Follow",
+    Weapon = "Melee",
+    KillAuraRange = 50,
+    AutoFruit = false,
+    AutoMaterials = false,
+    ESPEnabled = true,
+    AutoChest = false,
+    AutoRandomFruit = false,
+    AutoBerry = false,
+    AutoRaces = false,
+    AutoMirage = false,
+}
 
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "AdminTag"
-    billboard.Size = UDim2.new(0, 100, 0, 40)
-    billboard.Adornee = head
-    billboard.AlwaysOnTop = true
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0) -- above head
+-- ===== Status =====
+local Status = {
+    CurrentTarget = "None",
+    Action = "Idle",
+    LastFruit = "None",
+    LastMaterial = "None",
+    LastChest = "None",
+    LastBerry = "None",
+    LastRace = "None",
+    LastMirage = "None",
+}
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1,0,1,0)
-    label.BackgroundTransparency = 1
-    label.Text = "ADMIN"
-    label.TextColor3 = Color3.fromRGB(255,0,0)
-    label.Font = Enum.Font.SourceSansBold
-    label.TextScaled = true
-    label.Parent = billboard
-
-    billboard.Parent = head
+-- ===== Helper Functions =====
+local function moveTo(pos)
+    if HRP then
+        HRP.CFrame = CFrame.new(pos + Vector3.new(0,3,0))
+    end
 end
 
-createAdminTag(LocalPlayer)
+local function simulateAttack(target, targetType)
+    Status.CurrentTarget = target.Name
+    Status.Action = "Attacking "..targetType.." with "..config.Weapon
+end
+
+local function simulateCollect(item, itemType)
+    Status.Action = "Collecting "..itemType
+    if itemType=="Fruit" then Status.LastFruit = item.Name
+    elseif itemType=="Material" then Status.LastMaterial = item.Name
+    elseif itemType=="Chest" then Status.LastChest = item.Name
+    elseif itemType=="Berry" then Status.LastBerry = item.Name
+    elseif itemType=="Race" then Status.LastRace = item.Name
+    elseif itemType=="Mirage" then Status.LastMirage = item.Name
+    end
+    moveTo(item.Position)
+end
+
+-- ===== Get Items =====
+local function getEnemies() local e={} if Workspace:FindFirstChild("Enemies") then for _,v in pairs(Workspace.Enemies:GetChildren()) do if v:FindFirstChild("HumanoidRootPart") then table.insert(e,v) end end end return e end
+local function getBosses() local b={} for _,n in pairs({"CakeQueen","CakePrince","Ectoplasm","Bone","Materiel","Mirage"}) do local boss = Workspace:FindFirstChild(n); if boss then table.insert(b,boss) end end return b end
+local function getFruits() local f={} if Workspace:FindFirstChild("Fruits") then for _,v in pairs(Workspace.Fruits:GetChildren()) do table.insert(f,v) end end return f end
+local function getMaterials() local m={} if Workspace:FindFirstChild("Materials") then for _,v in pairs(Workspace.Materials:GetChildren()) do table.insert(m,v) end end return m end
+local function getChests() local c={} if Workspace:FindFirstChild("Chests") then for _,v in pairs(Workspace.Chests:GetChildren()) do table.insert(c,v) end end return c end
+local function getBerries() local b={} if Workspace:FindFirstChild("Berries") then for _,v in pairs(Workspace.Berries:GetChildren()) do table.insert(b,v) end end return b end
+local function getRaces() local r={} if Workspace:FindFirstChild("Races") then for _,v in pairs(Workspace.Races:GetChildren()) do table.insert(r,v) end end return r end
+local function getRandomFruit() local f={} if Workspace:FindFirstChild("RandomFruits") then for _,v in pairs(Workspace.RandomFruits:GetChildren()) do table.insert(f,v) end end return f end
 
 -- ===== ESP =====
-local ESPFolder = Instance.new("Folder", Workspace)
-ESPFolder.Name = "ESP"
-
-local function createESP(obj, color)
-    local rootPart = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
-    if not rootPart then return end
-
-    local box = Instance.new("BoxHandleAdornment")
-    box.Adornee = rootPart
-    box.Size = Vector3.new(2,5,1)
-    box.Color3 = color
-    box.AlwaysOnTop = true
-    box.ZIndex = 10
-    box.Transparency = 0.5
-    box.Parent = ESPFolder
+local function addHighlight(model,color)
+    if model and not model:FindFirstChild("Highlight") then
+        local hl = Instance.new("Highlight")
+        hl.Name="Highlight"
+        hl.FillColor=color
+        hl.FillTransparency=0.5
+        hl.OutlineColor=color
+        hl.OutlineTransparency=0
+        hl.Parent=model
+    end
 end
 
-local function updateESP()
-    ESPFolder:ClearAllChildren()
+local function clearHighlights()
+    for _,obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Highlight") then obj.Highlight:Destroy() end
+    end
+end
 
-    -- Players
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr.Character and plr.Character:FindFirstChild("Torso") then
-            local color = (plr == LocalPlayer) and Color3.fromRGB(255,0,0) or Color3.fromRGB(0,0,255)
-            createESP(plr.Character, color)
+RunService.RenderStepped:Connect(function()
+    if config.ESPEnabled then
+        clearHighlights()
+        for _, npc in pairs(getEnemies()) do addHighlight(npc,Color3.fromRGB(0,0,255)) end
+        for _, boss in pairs(getBosses()) do addHighlight(boss,Color3.fromRGB(255,0,0)) end
+        for _, fruit in pairs(getFruits()) do addHighlight(fruit,Color3.fromRGB(255,255,0)) end
+        for _, mat in pairs(getMaterials()) do addHighlight(mat,Color3.fromRGB(0,255,0)) end
+        for _, chest in pairs(getChests()) do addHighlight(chest,Color3.fromRGB(255,140,0)) end
+        for _, berry in pairs(getBerries()) do addHighlight(berry,Color3.fromRGB(255,0,255)) end
+        for _, race in pairs(getRaces()) do addHighlight(race,Color3.fromRGB(0,255,255)) end
+        for _, f in pairs(getRandomFruit()) do addHighlight(f,Color3.fromRGB(255,215,0)) end
+    else
+        clearHighlights()
+    end
+end)
+
+-- ===== AutoFarm Loops =====
+spawn(function()
+    while true do
+        if config.AutoFarm then
+            for _, enemy in pairs(getEnemies()) do
+                local dist = (HRP.Position - enemy.HumanoidRootPart.Position).Magnitude
+                if dist <= config.KillAuraRange then
+                    if config.FarmMode=="Follow" then moveTo(enemy.HumanoidRootPart.Position)
+                    elseif config.FarmMode=="Orbit" then moveTo(enemy.HumanoidRootPart.Position + Vector3.new(math.cos(tick())*5,0,math.sin(tick())*5))
+                    elseif config.FarmMode=="UpDown" then moveTo(enemy.HumanoidRootPart.Position + Vector3.new(0,math.sin(tick()*3)*5,0)) end
+                    simulateAttack(enemy,"Enemy")
+                end
+            end
+        end
+        wait(0.2)
+    end
+end)
+
+spawn(function()
+    while true do
+        if config.AutoFruit then for _, f in pairs(getFruits()) do simulateCollect(f,"Fruit") end end
+        if config.AutoMaterials then for _, m in pairs(getMaterials()) do simulateCollect(m,"Material") end end
+        if config.AutoChest then for _, c in pairs(getChests()) do simulateCollect(c,"Chest") end end
+        if config.AutoBerry then for _, b in pairs(getBerries()) do simulateCollect(b,"Berry") end end
+        if config.AutoRaces then for _, r in pairs(getRaces()) do simulateCollect(r,"Race") end end
+        if config.AutoRandomFruit then for _, f in pairs(getRandomFruit()) do simulateCollect(f,"Fruit") end end
+        wait(1)
+    end
+end)
+
+-- ===== Rayfield GUI =====
+local Window = Rayfield:CreateWindow({Name="Blox Fruits Learning GUI", LoadingTitle="Loading...", LoadingSubtitle="Safe & Educational", ConfigurationSaving={Enabled=false}})
+
+-- Controls Tab
+local ControlTab = Window:CreateTab("Controls")
+ControlTab:CreateToggle({Name="AutoFarm Enemies", CurrentValue=false, Flag="AutoFarm", Callback=function(v) config.AutoFarm=v end})
+ControlTab:CreateDropdown({Name="Farm Mode", Options={"Follow","Orbit","UpDown"}, CurrentOption="Follow", Flag="FarmMode", Callback=function(v) config.FarmMode=v end})
+ControlTab:CreateDropdown({Name="Weapon", Options={"Melee","Sword","Blox Fruits"}, CurrentOption="Melee", Flag="Weapon", Callback=function(v) config.Weapon=v end})
+ControlTab:CreateSlider({Name="Kill Aura Range", Min=10, Max=100, Increment=5, Suffix=" studs", CurrentValue=50, Flag="KillAuraRange", Callback=function(v) config.KillAuraRange=v end})
+ControlTab:CreateToggle({Name="Auto Fruits", CurrentValue=false, Flag="AutoFruit", Callback=function(v) config.AutoFruit=v end})
+ControlTab:CreateToggle({Name="Auto Materials", CurrentValue=false, Flag="AutoMaterials", Callback=function(v) config.AutoMaterials=v end})
+ControlTab:CreateToggle({Name="Auto Chests", CurrentValue=false, Flag="AutoChest", Callback=function(v) config.AutoChest=v end})
+ControlTab:CreateToggle({Name="Auto Berry", CurrentValue=false, Flag="AutoBerry", Callback=function(v) config.AutoBerry=v end})
+ControlTab:CreateToggle({Name="Auto Races", CurrentValue=false, Flag="AutoRaces", Callback=function(v) config.AutoRaces=v end})
+ControlTab:CreateToggle({Name="Auto Mirage", CurrentValue=false, Flag="AutoMirage", Callback=function(v) config.AutoMirage=v end})
+ControlTab:CreateToggle({Name="Auto Random Fruit", CurrentValue=false, Flag="AutoRandomFruit", Callback=function(v) config.AutoRandomFruit=v end})
+ControlTab:CreateToggle({Name="ESP Enabled", CurrentValue=true, Flag="ESPEnabled", Callback=function(v) config.ESPEnabled=v end})
+
+-- Shopping Tab (Simulation)
+local ShopTab = Window:CreateTab("Shopping")
+ShopTab:CreateButton({Name="Buy Random Fruit", Callback=function() Status.Action="Simulated Buying Random Fruit" end})
+ShopTab:CreateButton({Name="Buy Sword", Callback=function() Status.Action="Simulated Buying Sword" end})
+ShopTab:CreateButton({Name="Buy Melee", Callback=function() Status.Action="Simulated Buying Melee" end})
+ShopTab:CreateButton({Name="Buy Materials", Callback=function() Status.Action="Simulated Buying Materials" end})
+
+-- Status Tab
+local StatusTab = Window:CreateTab("Status")
+StatusTab:CreateLabel({Name="Current Target", Text=Status.CurrentTarget})
+StatusTab:CreateLabel({Name="Action", Text=Status.Action})
+StatusTab:CreateLabel({Name="Last Fruit", Text=Status.LastFruit})
+StatusTab:CreateLabel({Name="Last Material", Text=Status.LastMaterial})
+StatusTab:CreateLabel({Name="Last Chest", Text=Status.LastChest})
+StatusTab:CreateLabel({Name="Last Berry", Text=Status.LastBerry})
+StatusTab:CreateLabel({Name="Last Race", Text=Status.LastRace})
+StatusTab:CreateLabel({Name="Last Mirage", Text=Status.LastMirage})
+
+-- Update Status Tab
+RunService.RenderStepped:Connect(function()
+    for _, label in pairs(StatusTab:GetLabels()) do
+        if label.Name=="Current Target" then label:SetText(Status.CurrentTarget)
+        elseif label.Name=="Action" then label:SetText(Status.Action)
+        elseif label.Name=="Last Fruit" then label:SetText(Status.LastFruit)
+        elseif label.Name=="Last Material" then label:SetText(Status.LastMaterial)
+        elseif label.Name=="Last Chest" then label:SetText(Status.LastChest)
+        elseif label.Name=="Last Berry" then label:SetText(Status.LastBerry)
+        elseif label.Name=="Last Race" then label:SetText(Status.LastRace)
+        elseif label.Name=="Last Mirage" then label:SetText(Status.LastMirage)
         end
     end
-
-    -- NPCs
-    for _, npc in pairs(Workspace:GetChildren()) do
-        if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and not Players:FindFirstChild(npc.Name) then
-            createESP(npc, Color3.fromRGB(0,255,0))
-        end
-    end
-end
-
-RunService.RenderStepped:Connect(updateESP)
-
--- ===== Simple UI =====
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AdminUI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = PlayerGui
-
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0,250,0,150)
-Frame.Position = UDim2.new(0,10,0,50)
-Frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-Frame.BackgroundTransparency = 0.2
-Frame.BorderSizePixel = 0
-Frame.Parent = ScreenGui
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1,0,0,30)
-Title.Position = UDim2.new(0,0,0,0)
-Title.BackgroundTransparency = 1
-Title.Text = "Admin Panel"
-Title.TextColor3 = Color3.fromRGB(255,0,0)
-Title.Font = Enum.Font.SourceSansBold
-Title.TextScaled = true
-Title.Parent = Frame
-
--- ===== Buttons =====
-local function createButton(name, callback, yPos)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1,-20,0,30)
-    btn.Position = UDim2.new(0,10,0,yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
-    btn.Text = name
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextScaled = true
-    btn.Parent = Frame
-    btn.MouseButton1Click:Connect(callback)
-end
-
-createButton("Reset Character", function()
-    LocalPlayer.Character:BreakJoints()
-end, 40)
-
-createButton("WalkSpeed 50", function()
-    if LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = 50
-    end
-end, 80)
-
-createButton("Fly", function()
-    local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
-    if hum then hum.PlatformStand = true end
-end, 120)
+end)
