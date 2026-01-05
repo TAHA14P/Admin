@@ -1,26 +1,26 @@
--- Roblox Admin Script for R6 with ESP, Admin Tag, and UI
+-- R6 Admin Script with ESP + Admin Tag + Simple UI
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
--- ======== Admin Tag Above Head =========
+-- ===== Admin Tag =====
 local function createAdminTag(player)
     local character = player.Character or player.CharacterAdded:Wait()
     local head = character:WaitForChild("Head")
 
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "AdminTag"
-    billboard.Size = UDim2.new(0, 100, 0, 50)
+    billboard.Size = UDim2.new(0, 100, 0, 40)
     billboard.Adornee = head
     billboard.AlwaysOnTop = true
     billboard.StudsOffset = Vector3.new(0, 2.5, 0) -- above head
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.Text = "ADMIN"
-    label.TextColor3 = Color3.fromRGB(255, 0, 0)
+    label.Size = UDim2.new(1,0,1,0)
     label.BackgroundTransparency = 1
+    label.Text = "ADMIN"
+    label.TextColor3 = Color3.fromRGB(255,0,0)
     label.Font = Enum.Font.SourceSansBold
     label.TextScaled = true
     label.Parent = billboard
@@ -30,42 +30,35 @@ end
 
 createAdminTag(LocalPlayer)
 
--- ======== ESP =========
+-- ===== ESP =====
 local ESPFolder = Instance.new("Folder", Workspace)
 ESPFolder.Name = "ESP"
 
 local function createESP(obj, color)
-    if not obj:IsA("Model") then return end
-    local rootPart = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("Head")
+    local rootPart = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
     if not rootPart then return end
 
     local box = Instance.new("BoxHandleAdornment")
     box.Adornee = rootPart
-    box.Size = Vector3.new(4, 6, 2)
+    box.Size = Vector3.new(2,5,1)
     box.Color3 = color
     box.AlwaysOnTop = true
     box.ZIndex = 10
     box.Transparency = 0.5
     box.Parent = ESPFolder
-
-    return box
 end
 
--- Track ESP for players and NPCs
-local ESPConnections = {}
-
 local function updateESP()
-    -- Clear old ESP
     ESPFolder:ClearAllChildren()
-    
+
     -- Players
     for _, plr in pairs(Players:GetPlayers()) do
-        if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local color = plr == LocalPlayer and Color3.fromRGB(255,0,0) or Color3.fromRGB(0,0,255)
+        if plr.Character and plr.Character:FindFirstChild("Torso") then
+            local color = (plr == LocalPlayer) and Color3.fromRGB(255,0,0) or Color3.fromRGB(0,0,255)
             createESP(plr.Character, color)
         end
     end
-    
+
     -- NPCs
     for _, npc in pairs(Workspace:GetChildren()) do
         if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and not Players:FindFirstChild(npc.Name) then
@@ -76,17 +69,16 @@ end
 
 RunService.RenderStepped:Connect(updateESP)
 
--- ======== UI =========
-local StarterGui = game:GetService("StarterGui")
+-- ===== Simple UI =====
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AdminUI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = PlayerGui
 
--- Simple Command Frame
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 300, 0, 150)
-Frame.Position = UDim2.new(0, 10, 0, 50)
+Frame.Size = UDim2.new(0,250,0,150)
+Frame.Position = UDim2.new(0,10,0,50)
 Frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 Frame.BackgroundTransparency = 0.2
 Frame.BorderSizePixel = 0
@@ -95,33 +87,32 @@ Frame.Parent = ScreenGui
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1,0,0,30)
 Title.Position = UDim2.new(0,0,0,0)
-Title.Text = "Admin Commands"
-Title.TextColor3 = Color3.fromRGB(255,0,0)
 Title.BackgroundTransparency = 1
+Title.Text = "Admin Panel"
+Title.TextColor3 = Color3.fromRGB(255,0,0)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextScaled = true
 Title.Parent = Frame
 
--- Buttons Example
+-- ===== Buttons =====
 local function createButton(name, callback, yPos)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -20, 0, 30)
-    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.Size = UDim2.new(1,-20,0,30)
+    btn.Position = UDim2.new(0,10,0,yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
     btn.Text = name
     btn.Font = Enum.Font.SourceSansBold
     btn.TextScaled = true
-    btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
     btn.Parent = Frame
     btn.MouseButton1Click:Connect(callback)
 end
 
--- Example buttons
 createButton("Reset Character", function()
     LocalPlayer.Character:BreakJoints()
 end, 40)
 
-createButton("WalkSpeed +50", function()
+createButton("WalkSpeed 50", function()
     if LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid.WalkSpeed = 50
     end
@@ -129,9 +120,5 @@ end, 80)
 
 createButton("Fly", function()
     local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
-    if hum then
-        hum.PlatformStand = true
-    end
+    if hum then hum.PlatformStand = true end
 end, 120)
-
--- You can add more buttons for other commands here
