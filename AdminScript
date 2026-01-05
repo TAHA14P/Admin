@@ -1,22 +1,24 @@
--- Admin Script with ESP, Explorer, Properties
+-- Roblox Admin Script for R6 with ESP, Admin Tag, and UI
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
--- Admin Tag above head
+-- ======== Admin Tag Above Head =========
 local function createAdminTag(player)
     local character = player.Character or player.CharacterAdded:Wait()
     local head = character:WaitForChild("Head")
 
     local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 100, 0, 40)
+    billboard.Name = "AdminTag"
+    billboard.Size = UDim2.new(0, 100, 0, 50)
     billboard.Adornee = head
     billboard.AlwaysOnTop = true
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0) -- above head
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
-    label.Text = "Admin"
+    label.Text = "ADMIN"
     label.TextColor3 = Color3.fromRGB(255, 0, 0)
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.SourceSansBold
@@ -28,141 +30,108 @@ end
 
 createAdminTag(LocalPlayer)
 
--- ESP
-local espObjects = {}
+-- ======== ESP =========
+local ESPFolder = Instance.new("Folder", Workspace)
+ESPFolder.Name = "ESP"
 
-local function createESP(player)
-    if player == LocalPlayer then return end
-    local char = player.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+local function createESP(obj, color)
+    if not obj:IsA("Model") then return end
+    local rootPart = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("Head")
+    if not rootPart then return end
 
     local box = Instance.new("BoxHandleAdornment")
-    box.Adornee = root
-    box.Size = Vector3.new(4,6,2)
-    box.Color3 = Color3.fromRGB(0,255,0)
+    box.Adornee = rootPart
+    box.Size = Vector3.new(4, 6, 2)
+    box.Color3 = color
     box.AlwaysOnTop = true
     box.ZIndex = 10
     box.Transparency = 0.5
-    box.Parent = Workspace
-    espObjects[player] = box
+    box.Parent = ESPFolder
+
+    return box
 end
 
-local function removeESP(player)
-    if espObjects[player] then
-        espObjects[player]:Destroy()
-        espObjects[player] = nil
-    end
-end
+-- Track ESP for players and NPCs
+local ESPConnections = {}
 
-Players.PlayerAdded:Connect(createESP)
-Players.PlayerRemoving:Connect(removeESP)
-
-for _, plr in pairs(Players:GetPlayers()) do
-    createESP(plr)
-end
-
--- Explorer & Property Editor
-local function listChildren(obj, depth)
-    depth = depth or 0
-    print(string.rep("  ", depth) .. obj.Name .. " : " .. obj.ClassName)
-    for _, child in pairs(obj:GetChildren()) do
-        listChildren(child, depth+1)
-    end
-end
-
-local function setProperty(path, prop, value)
-    local target = Workspace:FindFirstChild(path, true)
-    if target then
-        if target[prop] ~= nil then
-            local success, err = pcall(function()
-                target[prop] = value
-            end)
-            if success then
-                print("Set "..prop.." of "..path.." to "..tostring(value))
-            else
-                print("Error:", err)
-            end
-        else
-            print("Property not found:", prop)
+local function updateESP()
+    -- Clear old ESP
+    ESPFolder:ClearAllChildren()
+    
+    -- Players
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local color = plr == LocalPlayer and Color3.fromRGB(255,0,0) or Color3.fromRGB(0,0,255)
+            createESP(plr.Character, color)
         end
-    else
-        print("Object not found:", path)
+    end
+    
+    -- NPCs
+    for _, npc in pairs(Workspace:GetChildren()) do
+        if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and not Players:FindFirstChild(npc.Name) then
+            createESP(npc, Color3.fromRGB(0,255,0))
+        end
     end
 end
 
--- Commands Table
-local commands = {}
+RunService.RenderStepped:Connect(updateESP)
 
-commands["kill"] = function(args)
-    local targetName = args[1]
-    local target = Players:FindFirstChild(targetName)
-    if target and target.Character and target.Character:FindFirstChild("Humanoid") then
-        target.Character.Humanoid.Health = 0
-    end
+-- ======== UI =========
+local StarterGui = game:GetService("StarterGui")
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AdminUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Simple Command Frame
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 300, 0, 150)
+Frame.Position = UDim2.new(0, 10, 0, 50)
+Frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+Frame.BackgroundTransparency = 0.2
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,0,0,30)
+Title.Position = UDim2.new(0,0,0,0)
+Title.Text = "Admin Commands"
+Title.TextColor3 = Color3.fromRGB(255,0,0)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.SourceSansBold
+Title.TextScaled = true
+Title.Parent = Frame
+
+-- Buttons Example
+local function createButton(name, callback, yPos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 30)
+    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.Text = name
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextScaled = true
+    btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.Parent = Frame
+    btn.MouseButton1Click:Connect(callback)
 end
 
-commands["speed"] = function(args)
-    local speed = tonumber(args[1])
-    if speed and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = speed
-    end
-end
+-- Example buttons
+createButton("Reset Character", function()
+    LocalPlayer.Character:BreakJoints()
+end, 40)
 
-commands["fly"] = function()
+createButton("WalkSpeed +50", function()
+    if LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = 50
+    end
+end, 80)
+
+createButton("Fly", function()
     local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
     if hum then
         hum.PlatformStand = true
     end
-end
+end, 120)
 
-commands["reset"] = function()
-    LocalPlayer.Character:BreakJoints()
-end
-
--- Explorer
-commands["explorer"] = function()
-    print("=== Explorer ===")
-    listChildren(Workspace)
-end
-
--- Set Property
-commands["setprop"] = function(args)
-    local objName = args[1]
-    local propName = args[2]
-    local value = args[3]
-
-    -- try to convert to number or bool if possible
-    if tonumber(value) then
-        value = tonumber(value)
-    elseif value == "true" then
-        value = true
-    elseif value == "false" then
-        value = false
-    end
-
-    setProperty(objName, propName, value)
-end
-
--- Chat Listener
-LocalPlayer.Chatted:Connect(function(msg)
-    if msg:sub(1,1) == ":" then
-        local args = msg:sub(2):split(" ")
-        local cmdName = table.remove(args,1):lower()
-        local func = commands[cmdName]
-        if func then
-            func(args)
-        else
-            print("Unknown command:", cmdName)
-        end
-    end
-end)
-
--- System message
-game:GetService("StarterGui"):SetCore("ChatMakeSystemMessage", {
-    Text = "[Admin] Loaded ESP + Explorer + Properties!";
-    Color = Color3.fromRGB(255,0,0);
-    Font = Enum.Font.SourceSansBold;
-    FontSize = Enum.FontSize.Size24;
-})
+-- You can add more buttons for other commands here
